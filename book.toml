@@ -10,7 +10,7 @@ edit-url-template = "https://github.com/13927/codex-book/edit/main/{path}"
 mathjax-support = true
 default-theme = "light"
 preferred-dark-theme = "navy"
-additional-js = ["mermaid.min.js", "mermaid-init.js"]
+additional-js = ["mermaid.min.js", "mermaid-init.js", "site-extras.js"]
 additional-css = ["theme/custom.css"]
 
 [output.html.print]
