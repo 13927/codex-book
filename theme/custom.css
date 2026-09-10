@@ -1,0 +1,161 @@
+/* Codex 技术解析 — 自定义主题层（清爽文档风）
+ * 只使用 mdBook 各主题已定义的 CSS 变量，保证 light/rust/navy/coal/ayu 下都协调。 */
+
+/* ---------- 字体与正文排版 ---------- */
+
+body {
+    font-family:
+        -apple-system, "SF Pro Text", "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+}
+
+.content {
+    line-height: 1.85;
+    letter-spacing: 0.012em;
+    font-size: 1.05em;
+}
+
+.content p,
+.content ul,
+.content ol {
+    margin: 0.9em 0;
+}
+
+.content li + li {
+    margin-top: 0.25em;
+}
+
+/* ---------- 标题层级 ---------- */
+
+.content h1 {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-bottom: 2px solid var(--table-border-color, #d8dbe0);
+    padding-bottom: 0.35em;
+}
+
+.content h2 {
+    font-weight: 650;
+    margin-top: 2.2em;
+    padding-left: 0.55em;
+    border-left: 4px solid var(--links);
+    line-height: 1.3;
+}
+
+.content h3 {
+    font-weight: 600;
+    margin-top: 1.8em;
+    opacity: 0.92;
+}
+
+/* ---------- 链接 ---------- */
+
+.content a {
+    text-decoration: none;
+    border-bottom: 1px dashed transparent;
+    transition: border-color 0.15s ease;
+}
+
+.content a:hover {
+    border-bottom-color: var(--links);
+}
+
+/* ---------- 引用块 → 卡片 ---------- */
+
+.content blockquote {
+    margin: 1.2em 0;
+    padding: 0.9em 1.1em;
+    background-color: var(--quote-bg);
+    border-left: 4px solid var(--quote-border);
+    border-radius: 0 8px 8px 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.content blockquote p:first-child {
+    margin-top: 0;
+}
+
+.content blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* ---------- 表格 ---------- */
+
+.content table {
+    width: 100%;
+    margin: 1.2em 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--table-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 0.95em;
+}
+
+.content table thead th {
+    background-color: var(--table-header-bg);
+    padding: 0.6em 0.8em;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content table td {
+    padding: 0.55em 0.8em;
+    border-top: 1px solid var(--table-border-color);
+}
+
+.content table tbody tr:nth-child(even) td {
+    background-color: var(--table-alternate-bg);
+}
+
+/* ---------- 代码 ---------- */
+
+.content :not(pre) > code {
+    border-radius: 5px;
+    padding: 0.12em 0.4em;
+    font-size: 0.88em;
+}
+
+.content pre {
+    border-radius: 8px;
+    border: 1px solid var(--table-border-color);
+    margin: 1.2em 0;
+}
+
+/* ---------- mermaid 图表 → 居中卡片 ---------- */
+
+.content pre.mermaid {
+    display: flex;
+    justify-content: center;
+    padding: 1.4em 1em;
+    background-color: var(--quote-bg);
+    border: 1px solid var(--table-border-color);
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    overflow-x: auto;
+}
+
+/* ---------- 侧边栏 ---------- */
+
+#sidebar {
+    border-right: 1px solid var(--table-border-color);
+}
+
+.chapter li.chapter-item.expanded > a,
+.chapter li.chapter-item > a.active {
+    font-weight: 650;
+}
+
+/* ---------- 页面上一下一章导航 ---------- */
+
+.nav-chapters {
+    border-top: 1px solid var(--table-border-color);
+}
+
+/* ---------- 打印优化 ---------- */
+
+@media print {
+    .content pre.mermaid {
+        box-shadow: none;
+    }
+}

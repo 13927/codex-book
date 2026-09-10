@@ -1,0 +1,17 @@
+[book]
+title = "Codex 技术解析"
+description = "由浅入深探究 Codex 的架构、实现、技术难点，并对照通用 agent 范式"
+language = "zh"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/13927/codex-book"
+edit-url-template = "https://github.com/13927/codex-book/edit/main/{path}"
+mathjax-support = true
+default-theme = "light"
+preferred-dark-theme = "navy"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+additional-css = ["theme/custom.css"]
+
+[output.html.print]
+enable = true
