@@ -159,108 +159,62 @@ pre,
     border-right: 1px solid var(--table-border-color);
 }
 
-.chapter li.chapter-item.expanded > a,
-.chapter li.chapter-item > a.active {
+/* 部分标题：小字、宽字距、弱化，与上一组拉开距离 */
+.chapter li.part-title {
+    margin: 1.6em 1em 0.4em;
+    font-size: 0.72em;
     font-weight: 650;
+    letter-spacing: 0.14em;
+    opacity: 0.55;
 }
 
-/* ---------- 页面操作条（site-extras.js 注入） ---------- */
-
-.page-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45em;
-    margin: 0.4em 0 1.6em;
-    padding-bottom: 1em;
-    border-bottom: 1px solid var(--table-border-color);
-}
-
-.page-actions a,
-.page-actions button {
-    font-size: 0.78em;
-    padding: 0.28em 0.85em;
-    border: 1px solid var(--table-border-color);
-    border-radius: 999px;
-    color: var(--fg);
-    background: transparent;
-    cursor: pointer;
+/* 章节条目：圆角胶囊，hover 淡底，过渡轻快。
+   注意：新版 mdBook 把 <a> 包在 .chapter-link-wrapper 里，且当前章下方会内嵌
+   “本页小节”锚点列表，必须用直接子选择器避免误伤。 */
+.chapter li.chapter-item > .chapter-link-wrapper > a {
+    margin: 1px 0.6em;
+    padding: 0.32em 0.7em;
+    border-radius: 7px;
+    border-left: 3px solid transparent;
     text-decoration: none;
     transition:
         color 0.15s ease,
-        border-color 0.15s ease,
-        background-color 0.15s ease;
+        background-color 0.15s ease,
+        border-color 0.15s ease;
 }
 
-.page-actions a:hover,
-.page-actions button:hover {
-    color: var(--links);
-    border-color: var(--links);
+.chapter li.chapter-item > .chapter-link-wrapper > a:hover {
     background-color: var(--quote-bg);
+    color: var(--links);
 }
 
-/* ---------- 右侧本页目录（site-extras.js 注入） ---------- */
-
-.page-toc {
-    display: none;
+/* 序号弱化，让标题文字成为主角 */
+.chapter li.chapter-item > .chapter-link-wrapper > a strong {
+    opacity: 0.45;
+    font-weight: 500;
 }
 
-@media (min-width: 1400px) {
-    .page-toc {
-        display: block;
-        position: fixed;
-        top: 4.5rem;
-        right: 1.2rem;
-        width: 200px;
-        max-height: calc(100vh - 6rem);
-        overflow-y: auto;
-        padding-left: 0.9em;
-        border-left: 2px solid var(--table-border-color);
-        font-size: 0.8em;
-        line-height: 1.6;
-    }
-
-    .page-toc-title {
-        font-weight: 650;
-        margin-bottom: 0.5em;
-        opacity: 0.75;
-    }
-
-    .page-toc a {
-        display: block;
-        color: var(--fg);
-        opacity: 0.68;
-        text-decoration: none;
-        padding: 0.12em 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        transition: opacity 0.15s ease;
-    }
-
-    .page-toc a.toc-h3 {
-        padding-left: 1.1em;
-    }
-
-    .page-toc a:hover {
-        opacity: 1;
-        color: var(--links);
-    }
-
-    .page-toc a.active {
-        opacity: 1;
-        color: var(--links);
-        font-weight: 600;
-    }
+/* 展开的父章节加粗 */
+.chapter li.chapter-item.expanded > .chapter-link-wrapper > a {
+    font-weight: 650;
 }
 
-/* ---------- 页脚（site-extras.js 注入） ---------- */
+/* 当前章节：左侧竖条 + 主题色淡底胶囊（color-mix 让明暗主题下都清晰可见） */
+.chapter li.chapter-item > .chapter-link-wrapper > a.active {
+    color: var(--links);
+    background-color: color-mix(in srgb, var(--links) 22%, transparent);
+    border-left-color: var(--links);
+    font-weight: 650;
+}
 
-.page-footer {
-    margin-top: 3.5em;
-    padding-top: 1.1em;
-    border-top: 1px solid var(--table-border-color);
-    font-size: 0.82em;
-    opacity: 0.72;
+/* 展开/折叠小箭头与文字对齐 */
+.chapter li.chapter-item .chapter-fold-toggle {
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+}
+
+.chapter li.chapter-item .chapter-fold-toggle:hover {
+    background-color: var(--quote-bg);
 }
 
 /* ---------- 页面操作条（site-extras.js 注入） ---------- */
