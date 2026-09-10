@@ -106,7 +106,7 @@ sequenceDiagram
 | 密钥登录函数 | login_with_api_key | 把接口密钥直接写成一份凭证文件 | codex-rs/login/src/auth/manager.rs |
 | 认证解析函数 | load_auth | 按优先级决定本次运行使用哪份凭证 | codex-rs/login/src/auth/manager.rs |
 | 持票人认证提供者 | BearerAuthProvider | 把令牌写进网络请求头的执行者 | codex-rs/model-provider/src/bearer_auth_provider.rs |
-| 未授权恢复函数 | handle_unauthorized | 请求被拒时触发一次令牌恢复并重试 | codex-rs/core/src/client.rs |
+| 认证恢复 | handle_unauthorized | 请求被拒时触发一次令牌恢复并重试 | codex-rs/core/src/client.rs |
 | 外部认证桥 | ExternalAuthBridge | 应用服务向持有凭证的客户端反向请求新令牌的通道 | codex-rs/app-server/src/external_auth.rs |
 
 ## 源码深挖
@@ -161,11 +161,11 @@ sequenceDiagram
 
 ### 令牌的注入与刷新
 
-这一小节看凭证"上岗"之后的事：它怎么被放进每一个发往模型服务的请求，以及快过期时怎么悄悄换新。出场角色：持票人认证提供者、认证管理器、未授权恢复函数、外部认证桥。读完你会理解"双保险"和"反向请求"这两个设计。
+这一小节看凭证"上岗"之后的事：它怎么被放进每一个发往模型服务的请求，以及快过期时怎么悄悄换新。出场角色：持票人认证提供者、认证管理器、认证恢复、外部认证桥。读完你会理解"双保险"和"反向请求"这两个设计。
 
 **注入。** 模型请求发出前，认证结果被转换为持票人认证提供者 `BearerAuthProvider`（codex-rs/model-provider/src/auth.rs#L319-L323），由它写入授权头与账号头（codex-rs/model-provider/src/bearer_auth_provider.rs#L32-L46）。
 
-**刷新是双保险。** 认证管理器每次取认证时都会主动检查（codex-rs/login/src/auth/manager.rs#L2372）：访问令牌距过期不足 5 分钟就换（#L2972-L2974），刷新令牌本身每 8 天强制轮换一次（#L2980）。万一仍撞上"未授权"响应，核心引擎一侧的未授权恢复函数 `handle_unauthorized`（codex-rs/core/src/client.rs#L2424）会触发一次恢复并重试。而在编辑器插件等"外部认证"模式下，应用服务（app-server）——所有前端的统一入口，见第 1 章——自己并不持有刷新能力，只能通过反向请求向持有凭证的客户端要新令牌：请求名是 `account/chatgptAuthTokens/refresh`（codex-rs/app-server-protocol/src/protocol/common.rs#L1777），桥接代码在外部认证桥（codex-rs/app-server/src/external_auth.rs#L33-L82），超时 10 秒（#L18）。
+**刷新是双保险。** 认证管理器每次取认证时都会主动检查（codex-rs/login/src/auth/manager.rs#L2372）：访问令牌距过期不足 5 分钟就换（#L2972-L2974），刷新令牌本身每 8 天强制轮换一次（#L2980）。万一仍撞上"未授权"响应，核心引擎一侧的认证恢复 `handle_unauthorized`（codex-rs/core/src/client.rs#L2424）会触发一次恢复并重试。而在编辑器插件等"外部认证"模式下，应用服务（app-server）——所有前端的统一入口，见第 1 章——自己并不持有刷新能力，只能通过反向请求向持有凭证的客户端要新令牌：请求名是 `account/chatgptAuthTokens/refresh`（codex-rs/app-server-protocol/src/protocol/common.rs#L1777），桥接代码在外部认证桥（codex-rs/app-server/src/external_auth.rs#L33-L82），超时 10 秒（#L18）。
 
 ## 技术难点与设计取舍
 

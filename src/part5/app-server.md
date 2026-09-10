@@ -62,7 +62,7 @@ graph TD
 | 中文名 | 英文名 | 职责（一句话） | 所在文件 |
 | ------ | ------ | -------------- | -------- |
 | 应用服务 | app-server | 所有前端的统一入口，托管核心引擎的服务进程 | codex-rs/app-server |
-| 传输层代码包 | app-server-transport | 把各形态连接的字节流解析成统一消息 | codex-rs/app-server-transport |
+| 服务传输层 | app-server-transport | 把各形态连接的字节流解析成统一消息 | codex-rs/app-server-transport |
 | 连接编号 | ConnectionId | 每条连接的唯一编号 | codex-rs/app-server-transport/src/outgoing_message.rs |
 | 传输事件 | TransportEvent | 接线员交给裁决者的三种信：新连接、新消息、连接关闭 | codex-rs/app-server-transport/src/transport/mod.rs |
 | 通道容量 | CHANNEL_CAPACITY | 所有内部信箱的统一容量上限，固定为 128 | codex-rs/app-server-transport/src/transport/mod.rs |
@@ -93,7 +93,7 @@ graph TD
 
 ### 三任务结构：监听、处理、出口
 
-这一段把应用服务的运行时拆成三类任务，回答"一条消息从进来到出去，总共经过几双手"。出场的是传输层代码包、消息处理器和出站路由函数。读完你就能画出概念段那张图的每一个箭头在源码里的落点。
+这一段把应用服务的运行时拆成三类任务，回答"一条消息从进来到出去，总共经过几双手"。出场的是服务传输层、消息处理器和出站路由函数。读完你就能画出概念段那张图的每一个箭头在源码里的落点。
 
 应用服务的运行时由三类任务构成，它们之间用三条有界消息通道解耦——有界消息通道（mpsc 通道）是多生产者、单消费者的异步队列，容量固定，满了发送方就得等或报错。三条通道的创建在 `codex-rs/app-server/src/lib.rs#L492-L496`：
 

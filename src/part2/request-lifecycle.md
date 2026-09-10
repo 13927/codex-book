@@ -106,23 +106,23 @@ sequenceDiagram
 | 应用命令 | AppCommand | 终端界面内部的应用级指令，回车被归约为它的"用户一轮"变体 | codex-rs/tui/src/app_command.rs |
 | 线程路由模块 | thread_routing | 终端界面里把应用命令分发到对应处理的模块 | codex-rs/tui/src/app/thread_routing.rs |
 | 应用服务会话适配器 | AppServerSession | 终端界面侧把界面动作打包成协议请求的发送口 | codex-rs/tui/src/app_server_session.rs |
-| 线程事件账簿 | ThreadEventStore | 终端界面侧接收服务端通知并记账，驱动增量渲染 | codex-rs/tui/src/app/thread_events.rs |
+| 线程事件账簿 | ThreadEventStore | 终端界面侧接收服务器通知并记账，驱动增量渲染 | codex-rs/tui/src/app/thread_events.rs |
 | 客户端请求 | ClientRequest | 前端发往应用服务的全部请求类型 | codex-rs/app-server-protocol/src/protocol/common.rs |
-| 服务端通知 | ServerNotification | 应用服务推给前端的事件载荷 | codex-rs/app-server-protocol/src/protocol/common.rs |
-| 服务端请求 | ServerRequest | 应用服务反向向前端发起的请求（如审批） | codex-rs/app-server-protocol/src/protocol/common.rs |
+| 服务器通知 | ServerNotification | 应用服务推给前端的事件载荷 | codex-rs/app-server-protocol/src/protocol/common.rs |
+| 服务器请求 | ServerRequest | 应用服务反向向前端发起的请求（如审批） | codex-rs/app-server-protocol/src/protocol/common.rs |
 | 串行作用域 | serialization_scope | 标记"哪些请求必须按线程排队执行"的请求字段 | codex-rs/app-server-protocol/src/protocol/common.rs |
 | 轮提交结果 | TurnInputSubmission | 核心引擎对一次提交的三分答复：新起、插队、拒绝 | codex-rs/protocol/src/turn_input.rs |
 | 操作信封 | Op | 投入会话邮箱的操作指令类型 | codex-rs/protocol/src/protocol.rs |
 | 消息处理器 | MessageProcessor | 应用服务内部真正处理每条请求的调度者 | codex-rs/app-server/src/message_processor.rs |
 | 准入闸 | turn_admission | 决定服务在关停排空时是否还接新的一轮 | codex-rs/app-server/src/turn_admission.rs |
 | 轮处理器 | turn_processor | 把协议层的"开始一轮"请求翻译成核心引擎的提交 | codex-rs/app-server/src/request_processors/turn_processor.rs |
-| 事件翻译与路由 | apply_bespoke_event_handling | 把核心引擎事件翻译并路由成服务端通知 | codex-rs/app-server/src/bespoke_event_handling.rs |
-| 线程生命周期监听 | thread_lifecycle | 为每条线程监听核心引擎事件流的模块 | codex-rs/app-server/src/request_processors/thread_lifecycle.rs |
+| 事件翻译与路由 | apply_bespoke_event_handling | 把核心引擎事件翻译并路由成服务器通知 | codex-rs/app-server/src/bespoke_event_handling.rs |
+| 线程生命周期模块 | thread_lifecycle | 为每条线程监听核心引擎事件流的模块 | codex-rs/app-server/src/request_processors/thread_lifecycle.rs |
 | 线程管理器 | ThreadManager | 按线程编号取回核心引擎线程句柄 | codex-rs/core/src/thread_manager.rs |
 | 核心引擎线程 | CodexThread | 一条线程在核心引擎内的句柄 | codex-rs/core/src/codex_thread.rs |
 | 会话 | Session | 核心引擎里一条会话的运行时 | codex-rs/core/src/session/mod.rs |
 | 会话收发口 | SessionIo | 会话对外收发操作信封的接口 | codex-rs/core/src/session/mod.rs |
-| 收件循环 | submission_loop | 逐条消费会话邮箱里的操作信封 | codex-rs/core/src/session/handlers.rs |
+| 提交循环 | submission_loop | 逐条消费会话邮箱里的操作信封 | codex-rs/core/src/session/handlers.rs |
 | 轮输入处理模块 | turn_input | 受理"新起或插队一轮"并派生轮任务 | codex-rs/core/src/session/turn_input.rs |
 | 常规任务 | RegularTask | 一轮在任务框架里的载体 | codex-rs/core/src/tasks/regular.rs |
 | 轮上下文 | TurnContext | 一轮的运行时上下文，携带轮的编号 | codex-rs/core/src/session/turn_context.rs |
@@ -209,7 +209,7 @@ codex-rs/protocol/src/turn_input.rs#L184），有三种可能：`Started`（新�
 ### 阶段 4：核心引擎收件、派生任务
 
 这一段看请求如何进入核心引擎的"传达室"：不直接敲门，而是投进邮箱排队。
-出场的有核心引擎线程、会话收发口、操作信封、收件循环和轮输入处理模块。
+出场的有核心引擎线程、会话收发口、操作信封、提交循环和轮输入处理模块。
 读完你会知道一个重要细节：轮的编号到底是从哪儿来的。
 
 `CodexThread::start_or_steer_turn`（codex-rs/core/src/codex_thread.rs#L321）
@@ -221,7 +221,7 @@ codex-rs/core/src/session/mod.rs#L396）：请求被包成操作信封的"轮输
 定义在 codex-rs/protocol/src/protocol.rs#L596），投入发件通道这个"邮箱"，
 并挂一个一次性的回调，等待核心引擎的受理决定。
 
-收件循环 `submission_loop`（codex-rs/core/src/session/handlers.rs#L529）
+提交循环 `submission_loop`（codex-rs/core/src/session/handlers.rs#L529）
 逐条消费邮箱，`Op::TurnInput` 分支
 （codex-rs/core/src/session/handlers.rs#L589）交给轮输入处理模块的
 `handle`（codex-rs/core/src/session/turn_input.rs#L202）→
@@ -264,7 +264,7 @@ codex-rs/core/src/tools/router.rs#L74）识别模型发出的函数调用并入�
 ### 阶段 7：事件回程
 
 这一段看"传菜口"：事件如何从核心引擎流回你的屏幕。出场的有会话的发事件
-函数、线程生命周期监听、事件翻译与路由、线程事件账簿。读完你会知道：为
+函数、线程生命周期模块、事件翻译与路由、线程事件账簿。读完你会知道：为
 什么说回程是"广播"而不是"应答"。
 
 核心引擎侧，`Session::send_event`
@@ -287,7 +287,7 @@ codex-rs/core/src/tools/router.rs#L74）识别模型发出的函数调用并入�
 `handle_turn_complete` 发出"轮完成"通知，输出项级事件由
 `item_event_to_server_notification`
 （codex-rs/app-server-protocol/src/protocol/event_mapping.rs#L30）映射成
-服务端通知（ServerNotification）。
+服务器通知（ServerNotification）。
 
 终端界面侧，`ThreadEventStore::push_notification`
 （codex-rs/tui/src/app/thread_events.rs#L174）把通知入账：
@@ -330,7 +330,7 @@ codex-rs/core/src/codex_thread.rs#L497），审批与中断也凭它对齐。应
 - **中断是反向注入的操作信封**："中断一轮"请求被翻译成
   `Op::Interrupt`
   （codex-rs/app-server/src/request_processors/turn_processor.rs#L1621）
-  投入同一邮箱，收件循环的中断分支
+  投入同一邮箱，提交循环的中断分支
   （codex-rs/core/src/session/handlers.rs#L545）调 `interrupt_task`
   （codex-rs/core/src/session/mod.rs#L4662）→
   `abort_all_tasks(TurnAbortReason::Interrupted)`
@@ -360,7 +360,7 @@ codex-rs/core/src/codex_thread.rs#L497），审批与中断也凭它对齐。应
 命令"与"读事件"拆成两条通道的做法）。
 
 **反向调用。** 审批在 Codex 里不是"事件"，而是服务端主动向客户端发起的
-服务端请求（ServerRequest，如"请求批准执行某条命令"）——远程调用的双向
+服务器请求（ServerRequest，如"请求批准执行某条命令"）——远程调用的双向
 调用，与语言服务器协议（LSP，编辑器与语言分析服务之间的通信协议）中服务
 端反问客户端配置的做法同理。智能体框架能否"中途问人"，差别就在有没有这条
 反向通道；只有事件流的框架只能让人"旁观"，不能让人"插手"。
@@ -383,4 +383,4 @@ codex-rs/core/src/codex_thread.rs#L497），审批与中断也凭它对齐。应
   串行。
 
 下一章：第 6 章「协议层」——把这条链路上飞的所有信封拆开：操作信封与事件
-消息的全貌、客户端请求 / 服务端通知 / 服务端请求三类载荷的字段细节。
+消息的全貌、客户端请求 / 服务器通知 / 服务器请求三类载荷的字段细节。

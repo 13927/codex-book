@@ -32,3 +32,7 @@
 - [TUI 内部架构](part5/tui.md)
 - [exec headless 模式](part5/exec-headless.md)
 - [app-server 深入](part5/app-server.md)
+
+# 附录
+
+- [术语表](appendix/glossary.md)

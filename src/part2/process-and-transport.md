@@ -90,12 +90,12 @@ graph LR
 | 进程内传输模块 | in_process | 用消息通道替代套接字、但保留同一协议信封 | codex-rs/app-server/src/in_process.rs |
 | 进程内启动函数 | start（in_process 模块内） | 启动进程内运行时并完成初始化握手 | codex-rs/app-server/src/in_process.rs |
 | 客户端投递函数 | try_send_client_message | 把客户端消息非阻塞地投进运行时队列 | codex-rs/app-server/src/in_process.rs |
-| 必达通知判定函数 | server_notification_requires_delivery | 判定哪些服务端通知丢了会导致状态失步 | codex-rs/app-server/src/in_process.rs |
+| 必达通知判定函数 | server_notification_requires_delivery | 判定哪些服务器通知丢了会导致状态失步 | codex-rs/app-server/src/in_process.rs |
 | 进程内事件枚举 | InProcessServerEvent | 进程内运行时发给客户端的事件（含掉队标记 Lagged） | codex-rs/app-server/src/in_process.rs |
 | 进程内客户端 | InProcessAppServerClient | 给同进程前端提供统一的请求与事件接口 | codex-rs/app-server-client/src/lib.rs |
 | 远程端点枚举 | RemoteAppServerEndpoint | 描述远程连接目标：网络套接字或本机套接字 | codex-rs/app-server-client/src/remote.rs |
 | 远程客户端 | RemoteAppServerClient | 连接守护进程或远程端点的客户端 | codex-rs/app-server-client/src/remote.rs |
-| 传输层模块 | app-server-transport | 四种传输的实现与事件归一化 | codex-rs/app-server-transport |
+| 服务传输层 | app-server-transport | 四种传输的实现与事件归一化 | codex-rs/app-server-transport |
 | 传输枚举 | AppServerTransport | 描述四种传输选择的枚举 | codex-rs/app-server-transport/src/transport/mod.rs |
 | 传输事件 | TransportEvent | 各传输上报给主循环的统一事件 | codex-rs/app-server-transport/src/transport/mod.rs |
 | 连接编号 | ConnectionId | 每条连接的递增编号 | codex-rs/app-server-transport/src/transport/mod.rs |
@@ -104,11 +104,11 @@ graph LR
 | 控制套接字传输 | unix_socket 模块 | 本机共享守护进程使用的套接字传输 | codex-rs/app-server-transport/src/transport/unix_socket.rs |
 | 网络套接字传输 | websocket 模块 | 唯一能跨机器的传输 | codex-rs/app-server-transport/src/transport/websocket.rs |
 | 终端界面 | TUI | 默认前端，负责选择连接目标并在失败时降级 | codex-rs/tui |
-| 连接目标枚举 | AppServerTarget | 终端界面三种连接目标的枚举 | codex-rs/tui/src/lib.rs |
+| 连接目标 | AppServerTarget | 终端界面三种连接目标的枚举 | codex-rs/tui/src/lib.rs |
 | 连接目标选择函数 | app_server_target_for_launch | 决定本次启动连内嵌、守护进程还是远程端点 | codex-rs/tui/src/lib.rs |
 | 守护进程探测函数 | maybe_probe_default_daemon_socket | 探测本机默认守护进程套接字是否可用 | codex-rs/tui/src/lib.rs |
 | 复用判定函数 | can_reuse_implicit_local_daemon | 判定本次启动是否有资格复用共享守护进程 | codex-rs/tui/src/lib.rs |
-| 守护进程管理模块 | app-server-daemon | 共享守护进程的生命周期管理（启动、停止等） | codex-rs/app-server-daemon |
+| 守护进程模块 | app-server-daemon | 共享守护进程的生命周期管理（启动、停止等） | codex-rs/app-server-daemon |
 
 ## 源码深挖
 
@@ -227,7 +227,7 @@ codex-rs/app-server/src/in_process.rs#L18-L33）——消息通道替代了套�
 3. **消息处理器到客户端（事件扇出）**：按消息语义分档处理。服务端发起的
    请求（比如向你询问是否批准某操作）**绝不静默丢弃**——塞不进事件队列
    时回送过载或内部错误给消息处理器，保证审批流不会无限挂起
-   （codex-rs/app-server/src/in_process.rs#L689-L719）。服务端通知再分两
+   （codex-rs/app-server/src/in_process.rs#L689-L719）。服务器通知再分两
    档：必达通知判定函数维护一份白名单
    （codex-rs/app-server/src/in_process.rs#L109-L124），上榜的是"轮（turn）
    完成""线程（thread）队列变化"等丢了会导致双方状态机失步的事件，它们用
@@ -243,7 +243,7 @@ codex-rs/app-server/src/in_process.rs#L18-L33）——消息通道替代了套�
 ### 守护进程复用与降级
 
 最后一小节回答导读里的第二个问题：第二个终端窗口能不能复用已经在跑的
-大脑？出场的是连接目标枚举、三个选择与降级函数。读完你会理解"共享是优化、
+大脑？出场的是连接目标、三个选择与降级函数。读完你会理解"共享是优化、
 不是依赖"这条纪律如何被代码钉死。
 
 终端界面的三种连接目标定义在一个枚举里

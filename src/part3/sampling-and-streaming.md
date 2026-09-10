@@ -75,7 +75,7 @@ flowchart TD
 | 采样请求循环 | run_sampling_request | 组装提示词、发起单次流式采样、失败后交给重试策略 | codex-rs/core/src/session/turn.rs |
 | 流式消费循环 | try_run_sampling_request | 逐个消费统一事件并分发给前端和工具执行器 | codex-rs/core/src/session/turn.rs |
 | 助手消息流解析器 | AssistantMessageStreamParsers | 按条目分槽累积文本增量，剥离引用与计划块 | codex-rs/core/src/session/turn.rs |
-| 在途工具队列 | FuturesOrdered | 让工具并发执行、但按入队顺序吐出结果 | codex-rs/core/src/session/turn.rs |
+| 有序并发收集器 | FuturesOrdered | 让工具并发执行、但按入队顺序吐出结果 | codex-rs/core/src/session/turn.rs |
 | 在途结果排空 | drain_in_flight | 流结束后按序落盘所有在途工具结果 | codex-rs/core/src/session/turn.rs |
 | 步上下文 | StepContext | 单次采样前拍下的现场快照（第 7 章定义） | codex-rs/core/src/session/step_context.rs |
 | 轮上下文 | TurnContext | 一轮对话的共享状态与配置（第 7 章定义） | codex-rs/core/src/session/turn_context.rs |
@@ -95,7 +95,7 @@ flowchart TD
 | 重试协调器 | handle_retryable_response_stream_error | 按优先级执行三级重试策略 | codex-rs/core/src/responses_retry.rs |
 | 流式错误通知 | notify_stream_error | 重连时向前端发"正在重连"事件 | codex-rs/core/src/session/mod.rs |
 | 输出项定稿分发 | handle_output_item_done | 把流式敲定的条目三分：工具、消息、回喂错误 | codex-rs/core/src/stream_events_utils.rs |
-| 工具调用执行器 | ToolCallRuntime | 接收敲定的工具调用并执行（第 11 章展开） | codex-rs/core/src/tools/parallel.rs |
+| 工具调用运行时 | ToolCallRuntime | 接收敲定的工具调用并执行（第 11 章展开） | codex-rs/core/src/tools/parallel.rs |
 | 会话 | Session | 一次对话的运行实体，持有活动轮状态 | codex-rs/core/src/session/mod.rs |
 | 中断入口 | interrupt_task | 响应用户打断，发起任务中止 | codex-rs/core/src/session/mod.rs |
 | 任务全量中止 | abort_all_tasks | 中止会话下所有运行中的任务 | codex-rs/core/src/tasks/mod.rs |
@@ -213,7 +213,7 @@ flowchart TD
 ### 流式条目的分发
 
 这一小节是本章最热闹的一段：统一事件流抵达流式消费循环后，每种事件被送往哪里？
-出场的有助手消息流解析器、输出项定稿分发、在途工具队列和在途结果排空。读完你会
+出场的有助手消息流解析器、输出项定稿分发、有序并发收集器和在途结果排空。读完你会
 理解"模型还在说、工具已经在跑"是如何做到的，以及为什么历史写入顺序永远等于模型
 输出顺序。
 
@@ -224,15 +224,15 @@ flowchart TD
 定"——交给输出项定稿分发（codex-rs/core/src/stream_events_utils.rs#L293）做三
 分：
 
-- **工具调用**：先落盘历史，再交工具调用执行器执行，返回的异步任务推入在途工具
-  队列（codex-rs/core/src/session/turn.rs#L2326），并置"需要续轮"标记；
+- **工具调用**：先落盘历史，再交工具调用运行时执行，返回的异步任务推入有序并发
+  收集器（codex-rs/core/src/session/turn.rs#L2326），并置"需要续轮"标记；
 - **非工具条目**（消息、推理等）：定稿成轮条目、发出条目完成事件
   （`ItemCompleted`）、提取"智能体最后一条发言"；
 - **回喂模型**：工具被拒绝或参数错误时，直接把错误合成一条工具结果
   （`FunctionCallOutput`）写回历史，喂给模型自我纠正。
 
-流结束后统一做在途结果排空（codex-rs/core/src/session/turn.rs#L2861）：在途工具
-队列按入队顺序吐出结果——**工具执行可以并发，历史写入顺序严格等于模型输出顺
+流结束后统一做在途结果排空（codex-rs/core/src/session/turn.rs#L2861）：有序并发
+收集器按入队顺序吐出结果——**工具执行可以并发，历史写入顺序严格等于模型输出顺
 序**，只增不改历史的确定性由此保住。流正常完结时冲刷解析器、记词元用量；若模型
 明确说"我还没说完"，就置上"需要续轮"标记再采一轮
 （codex-rs/core/src/session/turn.rs#L2689-L2691）。词元计数事件

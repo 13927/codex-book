@@ -37,7 +37,7 @@
   已定稿；
 - **工具调用运行时**是器械护士——医生可能一次伸手要好几件器械。护士决定
   哪些可以同时递，哪些必须等上一件用完；
-- **单步快照**是术前照片——清单、灯光、病人状态一次拍齐，保证「医生看到的
+- **步上下文**是术前照片——清单、灯光、病人状态一次拍齐，保证「医生看到的
   清单」和「护士手里的清单」永远是同一份。
 
 器械从三条路入库：Codex 自带的内置工具；经外部工具协议（Model Context
@@ -93,9 +93,9 @@ flowchart TD
 | 工具表构建函数 | build_tool_router | 每一步采样前现场构建工具表的管线 | codex-rs/core/src/tools/spec_plan.rs |
 | 定稿函数 | finalize_tool_router | 补注册、查重名，把注册表组装成路由器 | codex-rs/core/src/tools/spec_plan.rs |
 | 可见规格构建器 | build_model_visible_specs | 从注册表筛出本步发给模型的工具规格 | codex-rs/core/src/tools/spec_plan.rs |
-| 单步快照 | StepContext | 一次采样请求的完整快照，含定稿工具计划 | codex-rs/core/src/session/step_context.rs |
+| 步上下文 | StepContext | 一次采样请求的完整快照，含定稿工具计划 | codex-rs/core/src/session/step_context.rs |
 | 提示词 | Prompt | 发往模型的请求体，含输入与工具表 | codex-rs/core/src/client_common.rs |
-| 输出项处理器 | handle_output_item_done | 流式事件里收到完整输出项后的分发入口 | codex-rs/core/src/stream_events_utils.rs |
+| 输出项定稿分发 | handle_output_item_done | 流式事件里收到完整输出项后的分发入口 | codex-rs/core/src/stream_events_utils.rs |
 | 调用解析器 | build_tool_call | 把模型输出的调用项解析为统一分发对象 | codex-rs/core/src/tools/router.rs |
 | 分发入口 | dispatch_tool_call_with_terminal_outcome | 路由器上带终态上报的分发函数 | codex-rs/core/src/tools/router.rs |
 | 注册表分发器 | dispatch_any_with_terminal_outcome | 注册表上真正跑钩子与执行体的分发函数 | codex-rs/core/src/tools/registry.rs |
@@ -107,7 +107,7 @@ flowchart TD
 | 动态工具追加器 | append_dynamic_tool_runtimes | 把客户端声明的动态工具装进注册表 | codex-rs/core/src/tools/spec_plan.rs |
 | 有序并发收集器 | FuturesOrdered | 并发执行、按到达顺序取结果的队列（第三方库提供） | codex-rs/core/src/session/turn.rs |
 | 读写锁 | RwLock | 多读单写的并发门锁，即并行闸门本体 | codex-rs/core/src/tools/parallel.rs |
-| 在途调用排空器 | drain_in_flight | 收尾时按序取回所有在途调用的结果 | codex-rs/core/src/session/turn.rs |
+| 在途结果排空 | drain_in_flight | 收尾时按序取回所有在途调用的结果 | codex-rs/core/src/session/turn.rs |
 | 工具构建入口 | built_tools | 组装提示词前准备本步工具表的函数 | codex-rs/core/src/session/turn.rs |
 | 动态工具规格 | DynamicToolSpec | 客户端声明动态工具时用的描述结构 | codex-rs/protocol/src/dynamic_tools.rs |
 | 动态工具请求函数 | request_dynamic_tool | 核心引擎侧发起动态工具调用并挂起等待 | codex-rs/core/src/tools/handlers/dynamic.rs |
@@ -213,10 +213,10 @@ codex-rs/core/src/client_common.rs#L19-L28）——并行调用在协议层始�
 ### 分发与并行调度
 
 这一小节跟踪一张「工单」的下半场：模型写下调用之后，谁解析它、谁决定它能
-不能和别的调用同时跑、结果又怎样按顺序回到历史。出场的是输出项处理器、
+不能和别的调用同时跑、结果又怎样按顺序回到历史。出场的是输出项定稿分发、
 调用解析器、工具调用运行时，以及那把读写锁门。读完你会看懂并行两条军规。
 
-流式侧收到一个完整的工具调用项后，输出项处理器
+流式侧收到一个完整的工具调用项后，输出项定稿分发
 （codex-rs/core/src/stream_events_utils.rs#L293）先用调用解析器
 （router.rs#L246）把函数调用（FunctionCall）、自定义工具调用
 （CustomToolCall）与工具搜索调用解析成统一的分发对象，再交给本次采样创建
@@ -235,7 +235,7 @@ codex-rs/core/src/client_common.rs#L19-L28）——并行调用在协议层始�
 - **读写锁分流**：可并行者取读锁并发，其余取写锁独占
   （parallel.rs#L148-L152）。
 - **执行与历史顺序解耦**：调用任务按到达顺序进有序并发收集器
-  （turn.rs#L2326、L2504），收尾时在途调用排空器（turn.rs#L2229，调用点
+  （turn.rs#L2326、L2504），收尾时在途结果排空（turn.rs#L2229，调用点
   L2861）按序取出写历史——历史写入顺序严格等于模型输出顺序。
 - **中止不留洞**：未完成的调用被中止，并合成一条「被用户中止」的输出回灌
   （parallel.rs#L239、L250），保证每个调用编号都有对应结果。
@@ -280,10 +280,10 @@ codex-rs/core/src/client_common.rs#L19-L28）——并行调用在协议层始�
 
 **难点一：工具表与上下文快照的一致性。** 一轮之中，外部工具服务可能掉线、
 客户端可能改配置；如果宣告用 A 版工具表、执行用 B 版，模型就会「调用一个
-此刻不存在的工具」。解法是第 7 章的单步快照：工具路由器字段的注释明言它是
+此刻不存在的工具」。解法是第 7 章的步上下文：工具路由器字段的注释明言它是
 「这一次采样请求对外宣告并执行的定稿工具计划」
 （codex-rs/core/src/session/step_context.rs#L33-L34）；工具调用运行时干脆
-把整个单步快照存下来——注释写道「工具调用可能更晚才执行，所以要保留宣告
+把整个步上下文存下来——注释写道「工具调用可能更晚才执行，所以要保留宣告
 过它们的那一步」（parallel.rs#L44-L45）。代价是每步采样都重建工具表，
 换来宣告与执行同源。
 

@@ -13,14 +13,14 @@
 
 读完本章，你将能够：
 
-1. 说出"线程管理器、核心引擎线程、会话、轮上下文、采样快照"这五层对象
+1. 说出"线程管理器、核心引擎线程、会话、轮上下文、步上下文"这五层对象
    各自管什么、活多久；
 2. 描述你的一句话从提交进去，到模型开始思考，中间走过的完整路径；
 3. 解释发给模型的内容是怎么拼出来的，以及"历史只增不改"这条军规为什么
    重要。
 
 **前置章节**：第 1 章「总览」。如果只想走主线，记住三句话即可：会话是
-对话的运行核心，轮上下文是这一轮冻结下来的配置，采样快照是每次问模型
+对话的运行核心，轮上下文是这一轮冻结下来的配置，步上下文是每次问模型
 之前拍的一张一致的照片。
 
 ## 概念与架构
@@ -40,7 +40,7 @@
 - **轮上下文**是本轮工作单——每一轮（你发一句话到它答完，算一轮）开始
   时，把配置冻结下来：用哪个模型、在哪个目录干活、有什么权限。这一轮
   之内不再变；
-- **采样快照**是每次"打电话问顾问"前拍的一张照片——一轮里可能多次向
+- **步上下文**是每次"打电话问顾问"前拍的一张照片——一轮里可能多次向
   模型提问，每次提问前重新拍一张，保证这次提问里，对话上下文、可用
   工具表、权限设定三者互相对得上。
 
@@ -63,7 +63,7 @@ flowchart TD
     IQ["输入队列（信箱与插话通知）"]
     AT["活动轮 → 轮状态<br/>待处理输入、待审批、工具调用"]
     TC["轮上下文（一轮内冻结的配置）"]
-    SC["采样快照（单次提问前拍的一致照片）"]
+    SC["步上下文（单次提问前拍的一致照片）"]
 
     TM -- "按线程编号注册" --> CT
     CT --> SESS
@@ -76,7 +76,7 @@ flowchart TD
 ```
 
 读法很简单：左边三层（管理器、窗口、会话）寿命长，跟着对话走；右边
-两层（轮上下文、采样快照）寿命短，一轮一建、一问一拍。
+两层（轮上下文、步上下文）寿命短，一轮一建、一问一拍。
 
 ### 一轮的生命周期
 
@@ -85,10 +85,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["你的输入<br/>经对客窗口提交为操作指令"] --> B["提交消费循环<br/>（信箱逐条处理）"]
+    A["你的输入<br/>经对客窗口提交为操作指令"] --> B["提交循环<br/>（信箱逐条处理）"]
     B --> C["孵化出常规任务"]
     C --> D["轮主循环开始"]
-    D --> E["拍采样快照"]
+    D --> E["拍步上下文"]
     E --> F["你的输入写入历史"]
     F --> G{"一轮的主循环"}
     G --> H["组装提问内容<br/>（历史的提问用副本）"]
@@ -115,14 +115,14 @@ flowchart TD
 | 线程管理器 | ThreadManager | 线程注册表加共享服务：开工、复工、派生子对话的入口 | codex-rs/core/src/thread_manager.rs |
 | 核心引擎线程 | CodexThread | 对客窗口：上层只跟它打交道，它把调用翻译成操作指令 | codex-rs/core/src/codex_thread.rs |
 | 会话 | Session | 对话运行核心：持有状态、服务集、输入队列、活动轮 | codex-rs/core/src/session/session.rs |
-| 会话服务端点 | SessionIo | 会话的收发端点：提交通道接收操作指令，事件通道向外广播 | codex-rs/core/src/session/mod.rs |
+| 会话收发口 | SessionIo | 会话的收发端点：提交通道接收操作指令，事件通道向外广播 | codex-rs/core/src/session/mod.rs |
 | 输入队列 | InputQueue | 信箱：暂存输入并支持"插话"式追加 | codex-rs/core/src/session/input_queue.rs |
 | 轮上下文 | TurnContext | 一轮内冻结的配置：模型、环境、沙箱权限等 | codex-rs/core/src/session/turn_context.rs |
-| 采样快照 | StepContext | 单次提问前拍的一致快照：设置、工具路由器、外部工具绑定等 | codex-rs/core/src/session/step_context.rs |
+| 步上下文 | StepContext | 单次提问前拍的一致快照：设置、工具路由器、外部工具绑定等 | codex-rs/core/src/session/step_context.rs |
 | 任务种类 | TaskKind | 区分三种后台任务：常规、评审、手动压缩 | codex-rs/core/src/state/turn.rs |
-| 提交消费循环 | submission_loop | 逐个取出信箱里的操作指令并分发的循环（函数） | codex-rs/core/src/session/handlers.rs |
+| 提交循环 | submission_loop | 逐个取出信箱里的操作指令并分发的循环（函数） | codex-rs/core/src/session/handlers.rs |
 | 轮主循环 | run_turn | 一轮的主循环本体（函数）：拍快照、问模型、执行工具 | codex-rs/core/src/session/turn.rs |
-| 快照捕获函数 | capture_step_context | 每次提问前重新打包采样快照的函数 | codex-rs/core/src/session/mod.rs |
+| 快照捕获函数 | capture_step_context | 每次提问前重新打包步上下文的函数 | codex-rs/core/src/session/mod.rs |
 | 上下文管理器 | ContextManager | 持有对话历史，底层是写时复制结构，克隆极廉价 | codex-rs/core/src/context_manager/history.rs |
 | 提问用历史函数 | for_prompt | 把历史归一化成可发给模型的形态（函数） | codex-rs/core/src/context_manager/history.rs |
 | 上下文注入片段 | ContextualUserFragment | 所有注入块的统一接口：角色、类别、标记、正文四要素 | codex-rs/context-fragments/src/fragment.rs |
@@ -146,9 +146,9 @@ flowchart TD
 | `Session` | codex-rs/core/src/session/session.rs#L45 | 会话运行核心：`state`（互斥锁保护）、`services`、`input_queue`、`active_turn` |
 | `SessionIo` | codex-rs/core/src/session/mod.rs#L395 | 会话的收发端点：`tx_sub` 通道接收操作指令 |
 | `TurnContext` | codex-rs/core/src/session/turn_context.rs#L282 | 轮级冻结配置：模型、环境、沙箱上下文等 |
-| `StepContext` | codex-rs/core/src/session/step_context.rs#L18-L37 | 单次采样快照：设置、工具路由器、外部工具绑定、说明文件缓存、令牌预算 |
+| `StepContext` | codex-rs/core/src/session/step_context.rs#L18-L37 | 单次提问的步上下文：设置、工具路由器、外部工具绑定、说明文件缓存、令牌预算 |
 
-值得停下来看一眼采样快照的字段注释（codex-rs/core/src/session/step_context.rs#L18-L37）：
+值得停下来看一眼步上下文的字段注释（codex-rs/core/src/session/step_context.rs#L18-L37）：
 几乎每个字段都强调"这一次"——工具路由器是"本次采样请求对外宣告并执行的
 工具计划"，外部工具绑定是"本次捕获的连接、配置与目录"。这种措辞不是文档
 癖，而是在声明一个不变量：**同一次提问里，模型看到的工具表和实际执行工
@@ -160,8 +160,8 @@ flowchart TD
 一个后台任务、走进主循环。读完你就明白为什么"评审""压缩"这类特殊任务
 不会干扰主对话。
 
-上层调用核心引擎线程的提交方法后，操作指令（Op）经会话服务端点的
-`tx_sub` 通道进入信箱，由提交消费循环（codex-rs/core/src/session/handlers.rs#L529）
+上层调用核心引擎线程的提交方法后，操作指令（Op）经会话收发口的
+`tx_sub` 通道进入信箱，由提交循环（codex-rs/core/src/session/handlers.rs#L529）
 逐个取出分发：输入类指令走轮输入处理并孵化出常规任务，审批、控制、维护
 类指令走各自的处理函数。任务最终进入轮主循环 run_turn
 （codex-rs/core/src/session/turn.rs#L163）。
@@ -193,7 +193,7 @@ flowchart LR
 - **快照捕获**：快照捕获函数（codex-rs/core/src/session/mod.rs#L3520）
   在每次提问前重新执行，把当前历史、工具路由、外部工具绑定、项目说明
   文件（AGENTS.md，仓库里写给智能体看的说明书）缓存打包成一份新的
-  采样快照。
+  步上下文。
 - **历史管理**：上下文管理器（codex-rs/core/src/context_manager/history.rs#L69）
   持有对话历史，底层是共享指针包裹的数组，采用写时复制（多个读者共享
   同一份数据，只有真正要改时才复制）结构，克隆代价极低。提问用历史
@@ -222,7 +222,7 @@ flowchart LR
 
 **难点一：上下文、工具表、工具执行的一致性。** 一轮之中，你可能改配置、
 外部工具可能掉线、项目说明文件可能被编辑。如果提问用 A 版工具表、执行
-用 B 版，模型就会"调用一个此刻不存在的工具"。Codex 的解法是采样快照：
+用 B 版，模型就会"调用一个此刻不存在的工具"。Codex 的解法是步上下文：
 每次提问前把三者拍进同一张照片，本次请求的承诺与执行严格对齐。代价是
 每步都要重新捕获，但换来了一致性这个更重要的性质。
 
@@ -243,7 +243,7 @@ flowchart LR
 **智能体循环。** 学术与工程界常用的智能体循环抽象（ReAct 框架的
 "思考—行动—观察"三段循环）在 Codex 里落地为：采样（思考）→ 工具调用
 （行动）→ 结果回灌历史（观察）→ 再采样。Codex 的特化在于：循环的每一
-步都被显式建模成类型——轮上下文、采样快照、任务种类，而不是散落在
+步都被显式建模成类型——轮上下文、步上下文、任务种类，而不是散落在
 过程式代码里。
 
 **上下文工程。** 2024 年后业界逐渐形成共识：智能体质量的核心变量是
@@ -259,11 +259,11 @@ flowchart LR
 ## 小结与下一章预告
 
 - 五层对象：线程管理器（注册表）→ 核心引擎线程（对客窗口）→ 会话
-  （运行核心）→ 轮上下文（本轮冻结配置）→ 采样快照（单次提问的一致
+  （运行核心）→ 轮上下文（本轮冻结配置）→ 步上下文（单次提问的一致
   照片）；
-- 你的输入经信箱进入提交消费循环，孵化成任务后进入轮主循环：采样 →
+- 你的输入经信箱进入提交循环，孵化成任务后进入轮主循环：采样 →
   工具调用 → 结果回灌 → 再采样，直到模型不再要求调用工具；
-- 上下文三原则：采样快照保证一致性、只增不改保证缓存友好、写时复制
+- 上下文三原则：步上下文保证一致性、只增不改保证缓存友好、写时复制
   历史保证克隆廉价。
 
 下一章（第 8 章）「采样与流式处理」：轮主循环里那次"向模型发起提问"

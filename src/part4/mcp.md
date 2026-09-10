@@ -67,7 +67,7 @@ flowchart TD
     HTTP --> HS
     HS --> CAT["跨服务并发聚合<br/>过滤 + 前缀改名"]
     CAT --> ROUTER["注册进工具路由器（ToolRouter）"]
-    ROUTER --> SNAP["轮次快照（StepContext）"]
+    ROUTER --> SNAP["步上下文（StepContext）"]
     SNAP --> MODEL["模型采样（宣告工具表）"]
     MODEL -->|"点名调用"| H["调用分发器（McpHandler）<br/>解析参数 → 审批 → 拨号"]
     H --> SRV["外部服务执行"]
@@ -105,12 +105,12 @@ flowchart TD
 | 名称规范化器 | normalize_tools_for_model_with_prefix | 去重、哈希改名、压进长度上限 | codex-rs/codex-mcp/src/tools.rs |
 | 工具档案 | ToolInfo | 同时携带路由名、模型可见名与回传原名 | codex-rs/codex-mcp/src/tools.rs |
 | 绑定捕获器 | capture_binding_with_metadata | 为当轮采样捕获一份连接与工具目录绑定 | codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs |
-| 路由器构建器 | build_tool_router | 把内置与外部工具一起注册成工具路由器 | codex-rs/core/src/tools/spec_plan.rs |
+| 工具表构建函数 | build_tool_router | 把内置与外部工具一起注册成工具路由器 | codex-rs/core/src/tools/spec_plan.rs |
 | 暴露面政策 | apply_mcp_tool_exposure_policy | 按服务的忽略清单收缩对模型的暴露面 | codex-rs/core/src/tools/spec_plan.rs |
 | 处理器缓存 | McpHandlerCache | 把每条外部工具包成调用分发器并登记 | codex-rs/core/src/mcp_tool_exposure.rs |
 | 调用分发器 | McpHandler | 模型点名后负责解析、审批、拨号的处理器 | codex-rs/core/src/tools/handlers/mcp.rs |
 | 快照捕获函数 | capture_step_context_inner | 每次采样前冻结当轮上下文 | codex-rs/core/src/session/mod.rs |
-| 轮次快照 | StepContext | 一次采样冻结的完整上下文（含连接绑定与工具计划） | codex-rs/core/src/session/step_context.rs |
+| 步上下文 | StepContext | 一次采样冻结的完整上下文（含连接绑定与工具计划） | codex-rs/core/src/session/step_context.rs |
 | 连接绑定 | McpBinding | 当轮采样捕获的精确连接、配置与目录 | codex-rs/codex-mcp/src/binding.rs |
 | 备好的调用 | PreparedMcpCall | 带目录版本租约的一次待发调用 | codex-rs/codex-mcp/src/binding.rs |
 | 调用协调函数 | handle_mcp_tool_call | 解析参数、决定审批策略、驱动执行 | codex-rs/core/src/mcp_tool_call.rs |
@@ -202,7 +202,7 @@ codex-rs/codex-mcp/src/tools.rs#L22，可按配置或服务白名单省略。
 调用名、回传给服务的原始工具名（codex-rs/codex-mcp/src/tools.rs#L25-L45）
 ——两个名字从此各走各的路。
 
-### 暴露给模型与采样快照
+### 暴露给模型与步上下文
 
 这一小节看工牌怎么发：工具如何注册进路由器、何时直接可见、何时延迟加载，
 以及每次提问前那张快照包含什么。读完你会理解"宣告与执行同源"靠什么保证。
@@ -216,7 +216,7 @@ codex-rs/codex-mcp/src/tools.rs#L22，可按配置或服务白名单省略。
 必需服务和显式要求的插件才必须等到位
 （codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs#L194-L203）。
 
-聚合结果进入工具系统的路径在路由器构建器（build_tool_router）
+聚合结果进入工具系统的路径在工具表构建函数（build_tool_router）
 （codex-rs/core/src/tools/spec_plan.rs#L125）：处理器缓存把每条外部工具
 包成调用分发器登记进工具注册表
 （codex-rs/core/src/tools/spec_plan.rs#L159-L166；定义在
@@ -234,7 +234,7 @@ codex-rs/core/src/tools/spec_plan.rs#L213-L225）。每个调用分发器对模�
 「采样与流式处理」）前，会话调用快照捕获函数
 （codex-rs/core/src/session/mod.rs#L3570），先取当轮的连接绑定
 （codex-rs/core/src/session/mod.rs#L3649），再以它构建工具路由器
-（codex-rs/core/src/session/mod.rs#L3683）。两者一起写进轮次快照——字段
+（codex-rs/core/src/session/mod.rs#L3683）。两者一起写进步上下文——字段
 注释强调"本轮捕获的精确连接、配置与目录"
 （codex-rs/core/src/session/step_context.rs#L31-L32）和"本次采样对外宣告
 并执行的工具计划"（codex-rs/core/src/session/step_context.rs#L33-L34）。
@@ -309,11 +309,11 @@ codex-rs/core/src/session/mcp.rs#L561-L570）。
 全量重建，身份未变的连接直接复用。代价是各服务就绪度参差不齐，这正是难点
 二要兜底一致性的原因。
 
-**难点二：工具表动态变化 vs 采样快照。** 服务可以在任意时刻改变工具列表
+**难点二：工具表动态变化 vs 步上下文。** 服务可以在任意时刻改变工具列表
 （协议里有"工具列表已变更"通知，Codex 目前只记日志——
 codex-rs/rmcp-client/src/logging_client_handler.rs#L86）。如果采样按 A 版
 工具表宣告、执行按 B 版找工具，模型就会"调用一个此刻不存在的工具"。Codex
-上了双保险：轮次快照把连接绑定与工具路由器冻结进同一张快照
+上了双保险：步上下文把连接绑定与工具路由器冻结进同一张快照
 （codex-rs/core/src/session/step_context.rs#L31-L34），保证宣告与执行同源；
 执行侧再用目录版本租约兜底，准备期间变了就宁可拒绝
 （codex-rs/codex-mcp/src/binding.rs#L361-L364）。会话侧的变更管理靠脏标记：
@@ -355,7 +355,7 @@ codex-rs/protocol/src/protocol.rs#L1497），而不是发明第二套界面协�
 - 外部工具链路 = 三方来源合并花名册（花名册管理员）→ 会话级连接集（运行时
   与连接集，原子发布）→ 并发聚合与名称规范化 → 工具路由器暴露 → 调用分发
   器分发 → 目录版本租约下拨号；
-- 一致性靠双保险：轮次快照冻结"宣告与执行同源"，版本租约兜底"准备期间变了
+- 一致性靠双保险：步上下文冻结"宣告与执行同源"，版本租约兜底"准备期间变了
   就拒绝"；
 - 可靠性基调是"缺席不阻塞"：可选服务按需激活、失败隔离，预热工人只做尽力
   加速，正确性永远落在采样前的精确快照上；
